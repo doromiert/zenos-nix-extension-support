@@ -1,0 +1,10 @@
+{
+    "scopeName": "zen-nix.injection",
+    "injectionSelector": "L:source.nix, L:source.zen-nix",
+    "patterns": [
+        {
+            "match": "(?<![a-zA-Z0-9])(_[a-zA-Z0-9_-]+)",
+            "name": "storage.type.zenos"
+        }
+    ]
+}

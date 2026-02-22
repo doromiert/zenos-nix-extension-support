@@ -1,0 +1,49 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "ZenOS-extended Nix",
+  "scopeName": "source.zen-nix",
+  "patterns": [
+    {
+      "include": "#zen-internal-nodes"
+    },
+    {
+      "include": "#zen-variables"
+    },
+    {
+      "include": "#zen-types"
+    },
+    {
+      "include": "source.nix"
+    }
+  ],
+  "repository": {
+    "zen-internal-nodes": {
+        "match": "(_[a-zA-Z0-9_-]+)(?=[\\s.={])",
+        "name": "variable.other.member.zenos",
+        "captures": {
+            "1": {
+                "name": "markup.italic.zenos"
+            }
+        }
+    },
+    "zen-variables": {
+      "match": "\\$([a-zA-Z_]+)",
+      "name": "variable.language.zenos"
+    },
+    "zen-types": {
+      "begin": "\\((alias|zmdl|zdml|packages|programs|freeform)\\b",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.zen-type"
+        }
+      },
+      "end": "\\)",
+      "patterns": [
+        {
+          "match": "[^\\s\\)]+",
+          "name": "entity.name.type.zenos"
+        }
+      ]
+    }
+  }
+}

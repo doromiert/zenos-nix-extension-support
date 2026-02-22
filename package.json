@@ -1,0 +1,58 @@
+{
+  "name": "zenos-nix-extension-support",
+  "displayName": "ZenOS nix extension support",
+  "description": "This extension provides support for ZenOS's extensions of the nix language.",
+  "version": "0.0.1",
+  "publisher": "doromiert",
+  "icon": "icon.png",
+  "engines": {
+    "vscode": "^1.109.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "configurationDefaults": {
+        "[zen-nix]": {
+            "editor.semanticHighlighting.enabled": false
+        },
+        "editor.tokenColorCustomizations": {
+            "textMateRules": [
+                {
+                    "scope": "storage.type.zenos",
+                    "settings": {
+                        "fontStyle": "italic"
+                    }
+                }
+            ]
+        }
+    },
+    "languages": [
+      {
+        "id": "zen-nix",
+        "aliases": [
+          "ZenOS-extended Nix",
+          "zen-nix"
+        ],
+        "extensions": [
+          ".zstr",
+          ".zcfg",
+          ".zmdl"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "zen-nix",
+        "scopeName": "source.zen-nix",
+        "path": "./syntaxes/zen-nix.tmLanguage.json"
+      },
+        {
+            "scopeName": "zen-nix.injection",
+            "path": "./syntaxes/zen-nix-inject.json",
+            "injectTo": ["source.nix", "source.zen-nix"]
+        }
+    ]
+  }
+}
