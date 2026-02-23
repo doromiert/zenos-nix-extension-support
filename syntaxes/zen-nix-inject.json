@@ -5,6 +5,10 @@
         {
             "match": "(?<![a-zA-Z0-9])(_[a-zA-Z0-9_-]+)",
             "name": "storage.type.zenos"
+        },
+        {
+            "match": "\\$[a-zA-Z_]+",
+            "name": "keyword.variable.zenos"
         }
     ]
 }

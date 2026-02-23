@@ -27,9 +27,9 @@
         }
     },
     "zen-variables": {
-      "match": "\\$([a-zA-Z_]+)",
-      "name": "variable.language.zenos"
-    },
+  "match": "\\$[a-zA-Z_]+",
+  "name": "keyword.variable.zenos"
+},
     "zen-types": {
       "begin": "\\((alias|zmdl|zdml|packages|programs|freeform)\\b",
       "beginCaptures": {

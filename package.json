@@ -2,15 +2,24 @@
   "name": "zenos-nix-extension-support",
   "displayName": "ZenOS nix extension support",
   "description": "This extension provides support for ZenOS's extensions of the nix language.",
-  "version": "0.0.1",
+  "version": "0.0.4",
   "publisher": "doromiert",
   "icon": "icon.png",
+  "repository": {"url": "https://github.com/doromiert/zenos-nix-extension-support"},
   "engines": {
-    "vscode": "^1.109.0"
+    "vscode": "^1.85.0"
   },
   "categories": [
     "Programming Languages"
   ],
+  "main": "./dist/extension.js",
+    "activationEvents": [
+        "onLanguage:zen-nix"
+    ],
+    "devDependencies": {
+        "@types/vscode": "^1.85.0",
+        "typescript": "^5.0.0"
+    },
   "contributes": {
     "configurationDefaults": {
         "[zen-nix]": {
@@ -19,11 +28,17 @@
         "editor.tokenColorCustomizations": {
             "textMateRules": [
                 {
-                    "scope": "storage.type.zenos",
-                    "settings": {
-                        "fontStyle": "italic"
-                    }
+                "scope": "storage.type.zenos",
+                "settings": {
+                    "fontStyle": "italic"
                 }
+            },
+            {
+                "scope": "keyword.variable.zenos",
+                "settings": {
+                    "fontStyle": "bold italic"
+                }
+            }
             ]
         }
     },
