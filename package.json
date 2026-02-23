@@ -5,42 +5,48 @@
   "version": "0.0.4",
   "publisher": "doromiert",
   "icon": "icon.png",
-  "repository": {"url": "https://github.com/doromiert/zenos-nix-extension-support"},
+  "repository": {
+    "url": "https://github.com/doromiert/zenos-nix-extension-support"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
+  "extensionDependencies": [
+    "bbenoist.Nix"
+  ],
   "categories": [
     "Programming Languages"
   ],
   "main": "./dist/extension.js",
-    "activationEvents": [
-        "onLanguage:zen-nix"
-    ],
-    "devDependencies": {
-        "@types/vscode": "^1.85.0",
-        "typescript": "^5.0.0"
-    },
+  "activationEvents": [
+    "onLanguage:zen-nix"
+  ],
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.0.0"
+  },
   "contributes": {
     "configurationDefaults": {
-        "[zen-nix]": {
-            "editor.semanticHighlighting.enabled": false
-        },
-        "editor.tokenColorCustomizations": {
-            "textMateRules": [
-                {
-                "scope": "storage.type.zenos",
-                "settings": {
-                    "fontStyle": "italic"
-                }
-            },
-            {
-                "scope": "keyword.variable.zenos",
-                "settings": {
-                    "fontStyle": "bold italic"
-                }
+      "[zen-nix]": {
+        "editor.semanticHighlighting.enabled": false
+      },
+      "editor.tokenColorCustomizations": {
+        "textMateRules": [
+          {
+            "scope": "storage.type.zenos",
+            "settings": {
+              "fontStyle": "italic"
             }
-            ]
-        }
+          },
+          {
+            "scope": "keyword.variable.zenos",
+            "settings": {
+              "fontStyle": "bold italic"
+            }
+          }
+        ]
+      }
     },
     "languages": [
       {
@@ -63,11 +69,17 @@
         "scopeName": "source.zen-nix",
         "path": "./syntaxes/zen-nix.tmLanguage.json"
       },
-        {
-            "scopeName": "zen-nix.injection",
-            "path": "./syntaxes/zen-nix-inject.json",
-            "injectTo": ["source.nix", "source.zen-nix"]
-        }
+      {
+        "scopeName": "zen-nix.injection",
+        "path": "./syntaxes/zen-nix-inject.json",
+        "injectTo": [
+          "source.nix",
+          "source.zen-nix"
+        ]
+      }
     ]
+  },
+  "dependencies": {
+    "child_process": "^1.0.2"
   }
 }
