@@ -39,19 +39,68 @@ export function activate(context: vscode.ExtensionContext) {
           return item;
         };
 
+        const typeMatch = linePrefix.match(/\$type\.*$/);
+        if (typeMatch) {
+          [
+            "boolean",
+            "string",
+            "integer",
+            "float",
+            "array",
+            "set",
+            "null",
+            "function",
+            "color",
+            "enum",
+          ].forEach((t) => {
+            const item = createItemWithRange(
+              t,
+              vscode.CompletionItemKind.TypeParameter,
+              `\\$type.${t}`, // Escaped for SnippetString, remove '\\' if using raw insertText
+              "ZMDL Type Definition",
+              typeMatch[0],
+            );
+
+            // CRITICAL: Instructs VS Code to keep this item in the list
+            // even though the label is just "string" but the user typed "$type.s"
+            item.filterText = `$type.${t}`;
+
+            completions.push(item);
+          });
+
+          return completions;
+        }
+
         // 1. $ Variables Context
         const dollarMatch = linePrefix.match(/\$[a-zA-Z0-9_-]*$/);
         if (dollarMatch) {
-          ["$m", "$f", "$name", "$path"].forEach((v) => {
-            completions.push(
-              createItemWithRange(
-                v,
-                vscode.CompletionItemKind.Variable,
-                `\\${v}`,
-                "ZenOS Context Variable",
-                dollarMatch[0],
-              ),
+          [
+            "$name",
+            "$path",
+            "$pkgs",
+            "$lib",
+            "$m",
+            "$l",
+            "$type",
+            "$f",
+          ].forEach((v) => {
+            const item = createItemWithRange(
+              v,
+              vscode.CompletionItemKind.Variable,
+              `\\${v}`,
+              "ZenOS Context Variable",
+              dollarMatch[0],
             );
+
+            // Automatically trigger the next suggestion list if $type is selected
+            if (v === "$type") {
+              item.command = {
+                command: "editor.action.triggerSuggest",
+                title: "Re-trigger completions",
+              };
+            }
+
+            completions.push(item);
           });
 
           return completions;
