@@ -2,7 +2,7 @@
   "name": "zenos-nix-extension-support",
   "displayName": "ZenOS nix extension support",
   "description": "This extension provides support for ZenOS's extensions of the nix language.",
-  "version": "0.0.5",
+  "version": "0.0.7",
   "publisher": "doromiert",
   "icon": "icon.png",
   "repository": {

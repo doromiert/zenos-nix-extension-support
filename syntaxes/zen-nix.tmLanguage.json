@@ -18,7 +18,7 @@
   ],
   "repository": {
     "zen-internal-nodes": {
-        "match": "(_[a-zA-Z0-9_-]+)(?=[\\s.={])",
+        "match": "(_[a-zA-Z0-9_-]+)(?=[\\s.={:])",
         "name": "variable.other.member.zenos",
         "captures": {
             "1": {
@@ -27,11 +27,11 @@
         }
     },
     "zen-variables": {
-  "match": "\\$[a-zA-Z_]+",
-  "name": "keyword.variable.zenos"
-},
+        "match": "\\$[a-zA-Z_]+",
+        "name": "keyword.variable.zenos"
+    },
     "zen-types": {
-      "begin": "\\((alias|zmdl|zdml|packages|programs|freeform)\\b",
+      "begin": "\\((alias|zmdl|zdml|packages|programs|freeform|group|import|needs)\\b",
       "beginCaptures": {
         "1": {
           "name": "keyword.control.zen-type"

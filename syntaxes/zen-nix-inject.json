@@ -9,6 +9,10 @@
         {
             "match": "\\$[a-zA-Z_]+",
             "name": "keyword.variable.zenos"
+        },
+        {
+            "match": "(!)\\s*(?=\\{)",
+            "name": "keyword.operator.zenos"
         }
     ]
 }
