@@ -11,8 +11,12 @@
             "name": "keyword.variable.zenos"
         },
         {
-            "match": "(!)\\s*(?=\\{)",
-            "name": "keyword.operator.zenos"
+            "match": "(?:^|\\s)(s!|u!|!)(?=\\s*=?\\s*\\{)",
+            "captures": {
+                "1": {
+                    "name": "keyword.operator.zenos"
+                }
+            }
         }
     ]
 }

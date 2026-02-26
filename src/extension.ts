@@ -44,286 +44,126 @@ export function activate(context: vscode.ExtensionContext) {
         if (typeMatch) {
           [
             "boolean",
+            "bool",
             "string",
-            "integer",
+            "int",
             "float",
-            "array",
-            "set",
             "null",
-            "function",
+            "set",
+            "list",
+            "path",
+            "package",
+            "packages",
             "color",
+            "function",
             "enum",
-          ].forEach((t) => {
-            let insertStr = `\\$type.${t}`; // Escaped for SnippetString
-            if (t === "enum") {
-              insertStr = `\\$type.enum [ $1 ]`;
-            }
-
-            const item = createItemWithRange(
-              t,
-              vscode.CompletionItemKind.TypeParameter,
-              insertStr,
-              "ZMDL Type Definition",
-              typeMatch[0],
-            );
-
-            // CRITICAL: Instructs VS Code to keep this item in the list
-            // even though the label is just "string" but the user typed "$type.s"
-            item.filterText = `$type.${t}`;
-
-            completions.push(item);
-          });
-
-          return completions;
-        }
-
-        // 2. $v. Context (Dynamic _let variables tracking)
-        const vMatch = linePrefix.match(/\$v\.([a-zA-Z0-9_-]*)$/);
-        if (vMatch) {
-          const text = document.getText();
-          // Find all _let variables defined in the document
-          const letRegex = /_let\s+([a-zA-Z0-9_-]+)\s*:/g;
-          let match;
-          const vars = new Set<string>();
-
-          while ((match = letRegex.exec(text)) !== null) {
-            vars.add(match[1]);
-          }
-
-          vars.forEach((v) => {
+            "either",
+          ].forEach((type) => {
             completions.push(
               createItemWithRange(
-                v,
-                vscode.CompletionItemKind.Variable,
-                v,
-                "ZenOS Internal Variable",
-                vMatch[1],
+                `$type.${type}`,
+                vscode.CompletionItemKind.EnumMember,
+                type,
+                `ZenOS Type: ${type}`,
+                typeMatch[0],
               ),
             );
           });
-
-          return completions;
         }
 
-        // 3. $c. Context (Colors)
-        const cMatch = linePrefix.match(/\$c\.([a-zA-Z0-9_-]*)$/);
-        if (cMatch) {
+        // 2. Global Variables Context ($)
+        const globalVarMatch = linePrefix.match(/\$[a-zA-Z0-9_-]*$/);
+        if (globalVarMatch && !typeMatch) {
           [
-            "primary",
-            "secondary",
-            "accent",
-            "bg",
-            "fg",
-            "white",
-            "black",
-            "error",
-            "warning",
-          ].forEach((c) => {
-            completions.push(
-              createItemWithRange(
-                c,
-                vscode.CompletionItemKind.Color,
-                c,
-                "ZenOS Theme Color",
-                cMatch[1],
-              ),
-            );
-          });
-          return completions;
-        }
-
-        // 4. $ Variables Context (Root level)
-        const dollarMatch = linePrefix.match(/\$[a-zA-Z0-9_-]*$/);
-        if (dollarMatch) {
-          [
-            "$name",
-            "$path",
-            "$pkgs",
-            "$lib",
-            "$m",
-            "$l",
-            "$type",
-            "$f",
-            "$c",
-            "$v",
+            { label: "type", detail: "The ZenOS Type System" },
+            { label: "cfg", detail: "Global Evaluated Configuration" },
+            { label: "pkgs", detail: "ZenPkgs (Packages Only)" },
+            { label: "path", detail: "Nix-path to current module" },
+            { label: "name", detail: "Name of current node" },
+            { label: "v", detail: "Access _let variables" },
+            { label: "f", detail: "Access freeform identifiers" },
+            { label: "c", detail: "Color primitives" },
+            { label: "lib", detail: "Nixpkgs library" },
+            { label: "l", detail: "Licenses" },
+            { label: "m", detail: "Maintainers" },
           ].forEach((v) => {
-            const item = createItemWithRange(
-              v,
-              vscode.CompletionItemKind.Variable,
-              `\\${v}`,
-              "ZenOS Context Variable",
-              dollarMatch[0],
-            );
-
-            // Automatically trigger the next suggestion list if a namespace is selected
-            if (v === "$type" || v === "$v" || v === "$c") {
-              item.command = {
-                command: "editor.action.triggerSuggest",
-                title: "Re-trigger completions",
-              };
-            }
-
-            completions.push(item);
-          });
-
-          return completions;
-        }
-
-        // 5. _ Meta Nodes Context
-        const underscoreMatch = linePrefix.match(/_[a-zA-Z0-9_-]*$/);
-        if (underscoreMatch) {
-          completions.push(
-            createItemWithRange(
-              "_meta",
-              vscode.CompletionItemKind.Struct,
-              '_meta = {\n    brief = "${1:Description}";\n    type = ${2:type};\n    default = ${3:null};\n    license = ${4:lib.licenses.mit};\n    maintainers = [ ${5} ];\n};',
-              "ZenOS Metadata Block",
-              underscoreMatch[0],
-            ),
-          );
-
-          completions.push(
-            createItemWithRange(
-              "_let",
-              vscode.CompletionItemKind.Variable,
-              "_let ${1:name}: \\$type.${2:string} = ${3:value};",
-              "ZenOS Internal Variable",
-              underscoreMatch[0],
-            ),
-          );
-
-          ["action", "saction", "uaction"].forEach((act) => {
             completions.push(
               createItemWithRange(
-                `_${act}`,
-                vscode.CompletionItemKind.Function,
-                `_${act}`,
-                `ZenOS ${act.toUpperCase()} Hook`,
-                underscoreMatch[0],
+                `$${v.label}`,
+                vscode.CompletionItemKind.Variable,
+                v.label,
+                v.detail,
+                globalVarMatch[0],
               ),
             );
           });
-          return completions;
         }
 
-        // 6. ( Keywords Context
-        const parenMatch = linePrefix.match(/\([a-zA-Z0-9_-]*$/);
-        if (parenMatch) {
-          const createParenItem = (
-            label: string,
-            insert: string,
-            detail: string,
-          ) => {
-            const item = new vscode.CompletionItem(
-              label,
-              vscode.CompletionItemKind.Keyword,
-            );
-            item.insertText = new vscode.SnippetString(insert);
-            item.detail = detail;
-
-            const startPos = position.character - parenMatch[0].length;
-            item.range = new vscode.Range(
-              position.line,
-              Math.max(0, startPos),
-              position.line,
-              position.character,
-            );
-            return item;
-          };
-
-          completions.push(
-            createParenItem("zmdl", "(zmdl ${1:target})", "Zen Module Node"),
-          );
-          completions.push(
-            createParenItem("alias", "(alias ${1:target})", "Zen Alias Node"),
-          );
-          completions.push(
-            createParenItem("group", "(group ${1:name})", "Zen Group Node"),
-          );
-          completions.push(
-            createParenItem(
-              "import",
-              "(import ${1:path} {${2:args}})",
-              "Zen Import Node",
-            ),
-          );
-          completions.push(
-            createParenItem("needs", "(needs ${1:dep})", "Zen Needs Node"),
-          );
-
-          ["programs", "packages", "freeform"].forEach((kw) => {
+        // 3. Keywords & Metadata (_)
+        const keywordMatch = linePrefix.match(/_[a-zA-Z0-9_-]*$/);
+        if (keywordMatch) {
+          [
+            { label: "meta", detail: "Module Metadata block" },
+            { label: "let", detail: "Internal typed variable" },
+            { label: "action", detail: "Universal execution logic" },
+            { label: "saction", detail: "System-level execution logic" },
+            { label: "uaction", detail: "User-level execution logic" },
+          ].forEach((kw) => {
             completions.push(
-              createParenItem(kw, `(${kw})`, "ZenOS Structural Node"),
+              createItemWithRange(
+                `_${kw.label}`,
+                vscode.CompletionItemKind.Keyword,
+                kw.label,
+                kw.detail,
+                keywordMatch[0],
+              ),
             );
           });
-          return completions;
         }
 
-        // 7. Enum Value Assignment Context
-        // Evaluates if the cursor is currently on the right-hand side of a _let enum assignment
-        const textUntilPosition = document.getText(
-          new vscode.Range(new vscode.Position(0, 0), position),
-        );
-        const enumMatch = textUntilPosition.match(
-          /_let\s+[a-zA-Z0-9_-]+\s*:\s*(?:\$type\.)?enum\s*\[([\s\S]*?)\]\s*=[^;]*$/,
-        );
+        // 4. Action Shorthands (Expands to valid Nix syntax for nixfmt compatibility)
+        const shorthandMatch = linePrefix.match(/(?:^|\s)([su]!?|!)$/);
+        const isBlankLine = linePrefix.trim().length === 0;
 
-        if (enumMatch) {
-          const enumContent = enumMatch[1];
-          const options =
-            enumContent.match(/"([^"]+)"/g)?.map((s) => s.replace(/"/g, "")) ||
-            [];
+        if (shorthandMatch || isBlankLine) {
+          const matchText = shorthandMatch ? shorthandMatch[1] : "";
+          [
+            {
+              label: "!",
+              insert: "_action =",
+              detail: "Universal Action Shorthand",
+            },
+            {
+              label: "s!",
+              insert: "_saction =",
+              detail: "System Action Shorthand",
+            },
+            {
+              label: "u!",
+              insert: "_uaction =",
+              detail: "User Action Shorthand",
+            },
+          ].forEach((sh) => {
+            // Prevent 's' from incorrectly suggesting 'u!'
+            if (matchText && !sh.label.startsWith(matchText[0])) {
+              if (matchText !== "!") return;
+            }
 
-          if (options.length > 0) {
-            // Match partially typed words or quotes to replace them cleanly
-            const partialMatch = linePrefix.match(/"?[^"\s;]*$/);
-            const matchText = partialMatch ? partialMatch[0] : "";
-
-            options.forEach((opt) => {
-              completions.push(
-                createItemWithRange(
-                  `${opt}`,
-                  vscode.CompletionItemKind.EnumMember,
-                  `${opt}`,
-                  "ZenOS Enum Option",
-                  matchText,
-                ),
-              );
-            });
-
-            return completions;
-          }
-        }
-
-        // 8. Default Context (Types & Shorthand)
-        if (!/[$_(][a-zA-Z0-9_-]*$/.test(linePrefix)) {
-          ["boolean", "string", "int", "enum"].forEach((t) => {
-            const item = new vscode.CompletionItem(
-              t,
-              vscode.CompletionItemKind.TypeParameter,
+            completions.push(
+              createItemWithRange(
+                sh.label,
+                vscode.CompletionItemKind.Snippet,
+                `${sh.insert} {\n\t$0\n}`,
+                sh.detail,
+                matchText || "",
+              ),
             );
-            item.detail = "ZenOS Value Type";
-            completions.push(item);
           });
-
-          const bangItem = new vscode.CompletionItem(
-            "! action",
-            vscode.CompletionItemKind.Snippet,
-          );
-          bangItem.insertText = new vscode.SnippetString("! {\n    $0\n};");
-          bangItem.detail = "ZenOS Immediate Action Block";
-          bangItem.filterText = "!";
-          completions.push(bangItem);
         }
 
         return completions;
       },
     },
-    "_",
-    "$",
-    "(",
-    ".",
-    '"',
   );
 
   const diagnosticCollection =
@@ -485,8 +325,6 @@ export function activate(context: vscode.ExtensionContext) {
                 if (finalText.endsWith("}"))
                   finalText = finalText.substring(0, finalText.length - 1);
 
-                // Strip the 2-space indentation added by nixfmt for the wrapper
-                finalText = finalText.replace(/^  /gm, "");
                 finalText = finalText.trim() + "\n";
               }
 
