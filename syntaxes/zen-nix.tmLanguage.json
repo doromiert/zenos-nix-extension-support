@@ -3,20 +3,27 @@
   "name": "ZenOS-extended Nix",
   "scopeName": "source.zen-nix",
   "patterns": [
-    {
-      "include": "#zen-internal-nodes"
-    },
-    {
-      "include": "#zen-variables"
-    },
-    {
-      "include": "#zen-types"
-    },
-    {
-      "include": "source.nix"
-    }
+    { "include": "#zen-action-shorthands" },
+    { "include": "#zen-enable-option" },
+    { "include": "#zen-import" },
+    { "include": "#zen-internal-nodes" },
+    { "include": "#zen-variables" },
+    { "include": "#zen-types" },
+    { "include": "source.nix" }
   ],
   "repository": {
+    "zen-action-shorthands": {
+      "match": "(?:^|(?<=\\s))(s!!|u!!|!!|s!|u!|!)(?=\\s*(\\[.*?\\]\\s*)?\\{)",
+      "name": "keyword.control.zen-action"
+    },
+    "zen-enable-option": {
+      "match": "\\benableOption\\b",
+      "name": "support.function.zen"
+    },
+    "zen-import": {
+      "match": "\\b_import\\b",
+      "name": "keyword.control.import.zen"
+    },
     "zen-internal-nodes": {
         "match": "(_[a-zA-Z0-9_-]+)(?=[\\s.={:])",
         "name": "variable.other.member.zenos",

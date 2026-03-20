@@ -56,6 +56,7 @@ export function activate(context: vscode.ExtensionContext) {
             "packages",
             "color",
             "function",
+            "functionTo",
             "enum",
             "either",
           ].forEach((type) => {
@@ -86,6 +87,7 @@ export function activate(context: vscode.ExtensionContext) {
             { label: "lib", detail: "Nixpkgs library" },
             { label: "l", detail: "Licenses" },
             { label: "m", detail: "Maintainers" },
+            { label: "deps", detail: "Runtime deps (resolved store paths) — .zpkg only" },
           ].forEach((v) => {
             completions.push(
               createItemWithRange(
@@ -105,15 +107,36 @@ export function activate(context: vscode.ExtensionContext) {
           [
             { label: "meta", detail: "Module Metadata block" },
             { label: "let", detail: "Internal typed variable" },
-            { label: "action", detail: "Universal execution logic" },
-            { label: "saction", detail: "System-level execution logic" },
-            { label: "uaction", detail: "User-level execution logic" },
+            { label: "import", detail: "Import another ZenOS file" },
+            { label: "src", detail: ".zpkg source fetcher block" },
+            { label: "build", detail: ".zpkg build configuration" },
           ].forEach((kw) => {
+            let snippetBody: string;
+            if (kw.label === "let") {
+              snippetBody = `_let $0`;
+            } else if (kw.label === "meta") {
+              const metaFields = ["brief", "description", "dependencies", "version", "maintainers", "license"]
+                .map((v) =>
+                  v === "maintainers" || v === "dependencies"
+                    ? `\t${v} = [];\n`
+                    : `\t${v} = "";\n`,
+                )
+                .join("");
+              snippetBody = `_meta = {\n${metaFields}$0\n};`;
+            } else if (kw.label === "import") {
+              snippetBody = `_import "\${1:path}"`;
+            } else if (kw.label === "src") {
+              snippetBody = `_src = src.\${1|github,tarball,git,url|} {\n\towner = "\${2:owner}";\n\trepo  = "\${3:repo}";\n\trev   = "\${4:rev}";\n\thash  = "sha256-\${5:...}";\n};`;
+            } else if (kw.label === "build") {
+              snippetBody = `_build = {\n\ttype = \\$type.\${1|stdenv,cargo|};\n\t$0\n};`;
+            } else {
+              snippetBody = `_${kw.label} = {\n\t$0\n};`;
+            }
             completions.push(
               createItemWithRange(
                 `_${kw.label}`,
                 vscode.CompletionItemKind.Keyword,
-                kw.label,
+                snippetBody,
                 kw.detail,
                 keywordMatch[0],
               ),
@@ -121,41 +144,67 @@ export function activate(context: vscode.ExtensionContext) {
           });
         }
 
-        // 4. Action Shorthands (Expands to valid Nix syntax for nixfmt compatibility)
-        const shorthandMatch = linePrefix.match(/(?:^|\s)([su]!?|!)$/);
+        // 4. Action Shorthands — all six forms (!! before ! to avoid ambiguity)
+        const shorthandMatch = linePrefix.match(/(?:^|\s)(s!!|u!!|s!|u!|!!|!)$/);
         const isBlankLine = linePrefix.trim().length === 0;
 
         if (shorthandMatch || isBlankLine) {
           const matchText = shorthandMatch ? shorthandMatch[1] : "";
           [
-            {
-              label: "!",
-              insert: "_action =",
-              detail: "Universal Action Shorthand",
-            },
-            {
-              label: "s!",
-              insert: "_saction =",
-              detail: "System Action Shorthand",
-            },
-            {
-              label: "u!",
-              insert: "_uaction =",
-              detail: "User Action Shorthand",
-            },
+            { label: "!",   insert: "!",   detail: "Conditional action (generic)" },
+            { label: "!!",  insert: "!!",  detail: "Unconditional action (generic)" },
+            { label: "s!",  insert: "s!",  detail: "Conditional system action" },
+            { label: "s!!", insert: "s!!", detail: "Unconditional system action" },
+            { label: "u!",  insert: "u!",  detail: "Conditional user/HM action" },
+            { label: "u!!", insert: "u!!", detail: "Unconditional user/HM action" },
           ].forEach((sh) => {
-            // Prevent 's' from incorrectly suggesting 'u!'
-            if (matchText && !sh.label.startsWith(matchText[0])) {
-              if (matchText !== "!") return;
-            }
+            if (matchText && !sh.label.startsWith(matchText)) return;
 
             completions.push(
               createItemWithRange(
                 sh.label,
                 vscode.CompletionItemKind.Snippet,
-                `${sh.insert} {\n\t$0\n}`,
+                `${sh.insert} {\n\t$0\n};`,
                 sh.detail,
                 matchText || "",
+              ),
+            );
+          });
+        }
+
+        // 5. enableOption sugar (triggered when typing "enable...")
+        const enableMatch = linePrefix.match(/(?:^|\s)(enable[a-zA-Z0-9_-]*)$/);
+        if (enableMatch) {
+          completions.push(
+            createItemWithRange(
+              "enableOption",
+              vscode.CompletionItemKind.Function,
+              `enableOption {\n\t_meta.brief = "\${1:Install \\\$name}";\n\n\ts! {\n\t\t$0\n\t};\n}`,
+              "ZenOS: Standard boolean enable option sugar",
+              enableMatch[1],
+            ),
+          );
+        }
+
+        // 6. Structural node completions — triggered after '('
+        const structMatch = linePrefix.match(/\(\s*([a-zA-Z0-9_-]*)$/);
+        if (structMatch) {
+          const prefix = structMatch[1];
+          [
+            { type: "freeform",  snippet: `freeform \${1:id})`,   detail: "Open attr set with dynamic key name" },
+            { type: "zmdl",     snippet: `zmdl \${1:name})`,      detail: "Attach a .zmdl module" },
+            { type: "alias",    snippet: `alias \${1:path})`,     detail: "Alias to another config path" },
+            { type: "programs", snippet: `programs)`,             detail: "Programs namespace scope" },
+            { type: "packages", snippet: `packages)`,             detail: "Packages namespace scope" },
+          ].forEach(({ type, snippet, detail }) => {
+            if (prefix && !type.startsWith(prefix)) return;
+            completions.push(
+              createItemWithRange(
+                `(${type})`,
+                vscode.CompletionItemKind.Keyword,
+                snippet,
+                `ZenOS structural node — ${detail}`,
+                structMatch[0],
               ),
             );
           });
@@ -192,184 +241,233 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.languages.registerDocumentFormattingEditProvider(zenSelector, {
       provideDocumentFormattingEdits(
         document: vscode.TextDocument,
-      ): Promise<vscode.TextEdit[]> {
+      ): vscode.ProviderResult<vscode.TextEdit[]> {
+        const originalText = document.getText();
+        if (!originalText.trim()) return [];
+
+        // --- MASKING: Convert custom Z.O.N.E. syntax into valid Nix for nixfmt ---
+        let maskedText = originalText;
+
+        // Mask _import lines entirely (stored for restore after format)
+        const importLines: string[] = [];
+        maskedText = maskedText.replace(
+          /^(\s*)_import\b.*$/gm,
+          (match, indent) => {
+            importLines.push(match.trim());
+            return `${indent}__Z_IMPORT_${importLines.length - 1}__ = null`;
+          },
+        );
+
+        // Mask dep cascade operators ++[...] and --[...] (single-line)
+        const addOps: string[] = [];
+        maskedText = maskedText.replace(/\+\+\[[^\]]*\]/g, (match) => {
+          addOps.push(match);
+          return `__Z_ADDOP_${addOps.length - 1}__`;
+        });
+        const subOps: string[] = [];
+        maskedText = maskedText.replace(/--\[[^\]]*\]/g, (match) => {
+          subOps.push(match);
+          return `__Z_SUBOP_${subOps.length - 1}__`;
+        });
+
+        // Mask Path Interpolations `($var.name)` -> `__Z_PATH_VAR_0__` to prevent `.` parser crashes in nixfmt
+        const pathVars: string[] = [];
+        maskedText = maskedText.replace(
+          /\(\s*\$([a-zA-Z0-9_.-]+)\s*\)/g,
+          (match, p1) => {
+            pathVars.push(p1);
+            return `__Z_PATH_VAR_${pathVars.length - 1}__`;
+          },
+        );
+
+        // Mask $ variables -> __Z_DOL__
+        maskedText = maskedText.replace(/\$/g, "__Z_DOL__");
+
+        // Mask unconditional actions BEFORE their conditional counterparts
+        maskedText = maskedText.replace(
+          /(^|\s)s!!\s*=?\s*\{/gm,
+          "$1__Z_SUBBANG__ = {",
+        );
+        maskedText = maskedText.replace(
+          /(^|\s)u!!\s*=?\s*\{/gm,
+          "$1__Z_UUBBANG__ = {",
+        );
+        maskedText = maskedText.replace(
+          /(^|\s)!!\s*=?\s*\{/gm,
+          "$1__Z_DBBANG__ = {",
+        );
+
+        // Mask Conditional Action Shorthands -> __Z_*BANG__ =
+        maskedText = maskedText.replace(
+          /(^|\s)s!\s*=?\s*(\[.*?\]\s*)?\{/gm,
+          "$1__Z_SBANG__ = {",
+        );
+        maskedText = maskedText.replace(
+          /(^|\s)u!\s*=?\s*(\[.*?\]\s*)?\{/gm,
+          "$1__Z_UBANG__ = {",
+        );
+        maskedText = maskedText.replace(
+          /(^|\s)!\s*=?\s*(\[.*?\]\s*)?\{/gm,
+          "$1__Z_BANG__ = {",
+        );
+
+        // Mask Freeform Assignments -> __Z_FREEFORM__
+        maskedText = maskedText.replace(
+          /\(\s*freeform\s+([a-zA-Z0-9_-]+)\s*\)/g,
+          "__Z_FREEFORM__$1",
+        );
+
+        // Wrap the Z.O.N.E file in { ... } and use unique comments to force newlines
+        // and easily identify the boundaries of the formatted content.
+        const startMarker = "# __ZONE_FORMAT_START__";
+        const endMarker = "# __ZONE_FORMAT_END__";
+        const wrappedText = `{\n  ${startMarker}\n${maskedText}\n  ${endMarker}\n}`;
+
         return new Promise((resolve) => {
-          const text = document.getText();
-
-          let prepText = text;
-          let isWrapped = false;
-
-          // Dictionary to hold masked non-standard syntax
-          const maskDict = new Map<string, string>();
-          let maskId = 0;
-
-          // Helper to replace and store
-          const maskMatch = (match: string, prefix: string) => {
-            const placeholder = `__ZEN_${prefix}_${maskId++}__`;
-            maskDict.set(placeholder, match);
-            return placeholder;
-          };
-
-          // 1. Mask ZenOS _let Variable Declarations
-          let newPrepText = "";
-          let currentIndex = 0;
-          const letRegex =
-            /_let\s+[a-zA-Z0-9_-]+\s*:\s*(?:\$type\.[a-zA-Z0-9_-]+|[a-zA-Z0-9_-]+)/g;
-          let letMatch;
-
-          while ((letMatch = letRegex.exec(prepText)) !== null) {
-            newPrepText += prepText.substring(currentIndex, letMatch.index);
-            let i = letMatch.index + letMatch[0].length;
-            let depth = 0;
-            let inString = false;
-
-            // Scan forward to safely locate the matching '=' assignment
-            for (; i < prepText.length; i++) {
-              const char = prepText[i];
-              if (char === '"' && prepText[i - 1] !== "\\") {
-                inString = !inString;
-              }
-              if (!inString) {
-                if (char === "[" || char === "{" || char === "(") depth++;
-                if (char === "]" || char === "}" || char === ")") depth--;
-                if (depth === 0 && char === "=") {
-                  break;
-                }
-              }
-            }
-
-            if (i < prepText.length && prepText[i] === "=") {
-              const beforeArray = letMatch[0];
-              const middleContent = prepText
-                .substring(letMatch.index + letMatch[0].length, i)
-                .trim();
-
-              if (middleContent.length > 0) {
-                // If there's an array, split the mask so nixfmt can format the middle array natively
-                const startPlaceholder = `__ZEN_LET_S_${maskId}__`;
-                const endPlaceholder = `__ZEN_LET_E_${maskId}__`;
-                maskDict.set(startPlaceholder, beforeArray);
-                maskDict.set(endPlaceholder, "=");
-                maskId++;
-
-                newPrepText += `${startPlaceholder} = ${middleContent};\n${endPlaceholder} =`;
-              } else {
-                // No array (e.g. basic string/int type), mask normally
-                // Only take the text UP TO the '=' so the equal sign is left exposed for nixfmt
-                const fullMatch = prepText.substring(letMatch.index, i);
-                const placeholder = `__ZEN_LET_${maskId++}__`;
-                maskDict.set(placeholder, fullMatch.trimEnd());
-                newPrepText += placeholder + " ="; // Keep the '=' unmasked so nixfmt recognizes assignment
-              }
-              currentIndex = i + 1; // skip '='
-            } else {
-              newPrepText += letMatch[0];
-              currentIndex = letMatch.index + letMatch[0].length;
-            }
-          }
-          newPrepText += prepText.substring(currentIndex);
-          prepText = newPrepText;
-
-          // 2. Mask ZenOS Context Variables ($m, $name, etc.)
-          prepText = prepText.replace(/\$[a-zA-Z0-9_-]+/g, (match) =>
-            maskMatch(match, "VAR"),
-          );
-
-          // 3. Mask ZenOS Structural Nodes ((zmdl target), (programs), etc.)
-          // This regex supports up to one level of nested parentheses (e.g., `($f.user)`)
-          prepText = prepText.replace(
-            /\(\s*(zmdl|alias|programs|packages|freeform|group|import|needs)(?:[^)(]|\([^)(]*\))*\)/g,
-            (match) => maskMatch(match, "NODE"),
-          );
-
-          // 4. Mask Shorthand ! -> __ZEN_BANG_x__ =
-          // Nixfmt cannot format a bare expression inside an attribute list, so we map it to an assignment.
-          prepText = prepText.replace(/!(\s*\{)/g, (match, brace) => {
-            const placeholder = `__ZEN_BANG_${maskId++}__ =${brace}`;
-            maskDict.set(placeholder, match);
-            return placeholder;
-          });
-
-          // 5. Auto-wrap bare attribute lists missing the top-level { }
-          if (
-            !/^\s*(\{!?|let\b|with\b|rec\b|\[|\(|"[^"]*"|'[^']*'|[a-zA-Z0-9_-]+\s*:)/.test(
-              prepText,
-            )
-          ) {
-            prepText = "{\n" + prepText + "\n}";
-            isWrapped = true;
-          }
-
-          const nixfmtProcess = cp.spawn("nixfmt");
-
+          const nixfmt = cp.spawn("nixfmt");
           let stdout = "";
           let stderr = "";
 
-          nixfmtProcess.stdout.on("data", (data: Buffer | string) => {
+          nixfmt.stdout.on("data", (data) => {
             stdout += data.toString();
           });
 
-          nixfmtProcess.stderr.on("data", (data: Buffer | string) => {
+          nixfmt.stderr.on("data", (data) => {
             stderr += data.toString();
           });
 
-          nixfmtProcess.on("close", (code: number | null) => {
-            if (code === 0 && stdout.length > 0) {
-              let finalText = stdout;
+          nixfmt.on("error", () => {
+            vscode.window.showErrorMessage(
+              "nixfmt is not installed or could not be run.",
+            );
+            resolve([]);
+          });
 
-              // 4. Unwrap if we artificially wrapped it
-              if (isWrapped) {
-                finalText = finalText.trim();
-                if (finalText.startsWith("{"))
-                  finalText = finalText.substring(1);
-                if (finalText.endsWith("}"))
-                  finalText = finalText.substring(0, finalText.length - 1);
+          nixfmt.on("close", (code) => {
+            if (code === 0 && stdout) {
+              let formattedText = stdout;
 
-                finalText = finalText.trim() + "\n";
-              }
+              const startIndex = formattedText.indexOf(startMarker);
+              const endIndex = formattedText.lastIndexOf(endMarker);
 
-              // 5. Restore all ZenOS syntax from the dictionary
-              // Reverse the order to prevent nested placeholders (e.g. __ZEN_NODE_x__ containing __ZEN_VAR_y__)
-              // from leaving unresolved variables when unmasked in the wrong order.
-              const placeholders = Array.from(maskDict.keys()).reverse();
-              for (const placeholder of placeholders) {
-                const originalText = maskDict.get(placeholder)!;
-                if (placeholder.startsWith("__ZEN_LET_S_")) {
-                  // Special replacement to eat the `=` added for nixfmt
-                  finalText = finalText.replace(
-                    new RegExp(placeholder + "\\s*="),
-                    () => originalText,
-                  );
-                } else if (placeholder.startsWith("__ZEN_LET_E_")) {
-                  // Special replacement to eat the `;` added for nixfmt
-                  finalText = finalText.replace(
-                    new RegExp(";\\s*" + placeholder + "\\s*="),
-                    () => " =",
-                  );
-                } else {
-                  finalText = finalText.replace(
-                    new RegExp(placeholder, "g"),
-                    () => originalText, // Arrow function prevents '$$' escaping behaviors
-                  );
+              if (startIndex !== -1 && endIndex !== -1) {
+                // Find how much the start marker was indented by nixfmt
+                let baseIndent = 0;
+                let i = startIndex - 1;
+                while (i >= 0 && formattedText[i] === " ") {
+                  baseIndent++;
+                  i--;
                 }
-              }
 
-              const fullRange = new vscode.Range(
-                document.lineAt(0).range.start,
-                document.lineAt(document.lineCount - 1).range.end,
-              );
-              resolve([vscode.TextEdit.replace(fullRange, finalText)]);
+                let innerText = formattedText.substring(
+                  startIndex + startMarker.length,
+                  endIndex,
+                );
+
+                // Remove leading/trailing newlines specifically from the slice
+                innerText = innerText
+                  .replace(/^\r?\n/, "")
+                  .replace(/\r?\n[ \t]*$/, "");
+
+                const lines = innerText.split("\n");
+                const unindentedLines = lines.map((line) => {
+                  const prefix = " ".repeat(baseIndent);
+                  if (line.startsWith(prefix)) {
+                    return line.substring(baseIndent);
+                  } else if (line.trim() === "") {
+                    return ""; // clean up empty lines
+                  }
+                  return line;
+                });
+
+                formattedText = unindentedLines.join("\n");
+
+                // --- UNMASKING: Restore custom Z.O.N.E. syntax ---
+                formattedText = formattedText.replace(/__Z_DOL__/g, "$");
+                formattedText = formattedText.replace(
+                  /__Z_PATH_VAR_(\d+)__/g,
+                  (match, p1) => {
+                    return `($${pathVars[parseInt(p1, 10)]})`;
+                  },
+                );
+                // Unmask conditional actions
+                formattedText = formattedText.replace(
+                  /__Z_SBANG__\s*=\s*\{/g,
+                  "s! {",
+                );
+                formattedText = formattedText.replace(
+                  /__Z_UBANG__\s*=\s*\{/g,
+                  "u! {",
+                );
+                formattedText = formattedText.replace(
+                  /__Z_BANG__\s*=\s*\{/g,
+                  "! {",
+                );
+                // Unmask unconditional actions
+                formattedText = formattedText.replace(
+                  /__Z_SUBBANG__\s*=\s*\{/g,
+                  "s!! {",
+                );
+                formattedText = formattedText.replace(
+                  /__Z_UUBBANG__\s*=\s*\{/g,
+                  "u!! {",
+                );
+                formattedText = formattedText.replace(
+                  /__Z_DBBANG__\s*=\s*\{/g,
+                  "!! {",
+                );
+                formattedText = formattedText.replace(
+                  /__Z_FREEFORM__([a-zA-Z0-9_-]+)/g,
+                  "(freeform $1)",
+                );
+                // Unmask dep cascade operators
+                formattedText = formattedText.replace(
+                  /__Z_ADDOP_(\d+)__/g,
+                  (_, i) => addOps[parseInt(i, 10)],
+                );
+                formattedText = formattedText.replace(
+                  /__Z_SUBOP_(\d+)__/g,
+                  (_, i) => subOps[parseInt(i, 10)],
+                );
+                // Unmask _import lines (must be last — restores entire line)
+                formattedText = formattedText.replace(
+                  /^(\s*)__Z_IMPORT_(\d+)__\s*=\s*null\s*;?/gm,
+                  (_, indent, i) => `${indent}${importLines[parseInt(i, 10)]}`,
+                );
+
+                // Preserve trailing newline if the original file had one
+                if (originalText.endsWith("\n")) {
+                  formattedText += "\n";
+                }
+
+                const fullRange = new vscode.Range(
+                  document.positionAt(0),
+                  document.positionAt(originalText.length),
+                );
+
+                resolve([vscode.TextEdit.replace(fullRange, formattedText)]);
+              } else {
+                vscode.window.showErrorMessage(
+                  "Formatting failed: Markers were lost.",
+                );
+                resolve([]);
+              }
             } else {
-              vscode.window.showWarningMessage(`nixfmt failed: ${stderr}`);
+              // Expose the error so we know what broke!
+              vscode.window.showErrorMessage(
+                `Z.O.N.E Formatting Error: ${stderr.trim()}`,
+              );
               resolve([]);
             }
           });
 
-          nixfmtProcess.stdin.write(prepText);
-          nixfmtProcess.stdin.end();
+          nixfmt.stdin.write(wrappedText);
+          nixfmt.stdin.end();
         });
       },
     });
+
+  context.subscriptions.push(formattingProvider);
 }
 
 function scheduleDiagnostics(
@@ -531,8 +629,11 @@ function runStaticHeuristics(doc: vscode.TextDocument): vscode.Diagnostic[] {
       }
     }
 
-    // Track if we are inside an _action, _saction, _uaction, or an immediate action (!) to disable static checks there
-    if (/_(?:u|s)?action\s*=/.test(trimmed) || /^!(\s*\{|$)/.test(trimmed)) {
+    // Track if we are inside an action block (any shorthand form) to disable static checks there
+    if (
+      /_(?:u|s)?action(?:_unconditional)?\s*=/.test(trimmed) ||
+      /^(?:s!!|u!!|!!|s!|u!|!)(\s*\[.*?\])?\s*\{/.test(trimmed)
+    ) {
       insideActionBlock = true;
       actionBlockDepth = stack.length;
     }
@@ -655,6 +756,12 @@ function runNixCompilerChecks(
     (match) => "_" + " ".repeat(match.length - 2) + "=",
   );
 
+  // 1.5. Mask Path Interpolation ($v.foo -> v       )
+  masked = masked.replace(
+    /\(\s*\$[a-zA-Z0-9_.-]+\s*\)/g,
+    (match) => "v" + " ".repeat(match.length - 1),
+  );
+
   // 2. Mask Zen variables ($v.foo -> v    )
   masked = masked.replace(
     /\$[a-zA-Z0-9_.-]+/g,
@@ -667,7 +774,15 @@ function runNixCompilerChecks(
     (match) => "n" + " ".repeat(match.length - 1),
   );
 
-  // 4. Mask Bang Action (! { -> _= { )
+  // 4. Mask all action shorthands (unconditional before conditional, to avoid partial matches)
+  // s!!, u!!, !!
+  masked = masked.replace(/(^|\s)s!!\s*(\[.*?\]\s*)?\{/gm, (m, pre) => pre + "_s_unco={");
+  masked = masked.replace(/(^|\s)u!!\s*(\[.*?\]\s*)?\{/gm, (m, pre) => pre + "_u_unco={");
+  masked = masked.replace(/(^|\s)!!\s*(\[.*?\]\s*)?\{/gm,  (m, pre) => pre + "_unco={");
+  // s!, u! (with optional guard)
+  masked = masked.replace(/(^|\s)s!\s*(\[.*?\]\s*)?\{/gm, (m, pre) => pre + "_s_cond={");
+  masked = masked.replace(/(^|\s)u!\s*(\[.*?\]\s*)?\{/gm, (m, pre) => pre + "_u_cond={");
+  // bare ! (with optional guard) — length-preserving for accurate column reporting
   masked = masked.replace(/!(\s*)\{/g, (match, spaces) => {
     if (spaces.length > 0) {
       return "_=" + " ".repeat(spaces.length - 1) + "{";

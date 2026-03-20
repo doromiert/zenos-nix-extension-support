@@ -2,7 +2,7 @@
   "name": "zenos-nix-extension-support",
   "displayName": "ZenOS nix extension support",
   "description": "This extension provides support for ZenOS's extensions of the nix language.",
-  "version": "0.0.8",
+  "version": "0.1.1",
   "publisher": "doromiert",
   "icon": "icon.png",
   "repository": {
@@ -19,7 +19,7 @@
   ],
   "main": "./dist/extension.js",
   "devDependencies": {
-    "@types/node": "^25.3.0",
+    "@types/node": "^25.3.2",
     "@types/vscode": "^1.85.0",
     "typescript": "^5.0.0"
   },
@@ -55,7 +55,8 @@
         "extensions": [
           ".zstr",
           ".zcfg",
-          ".zmdl"
+          ".zmdl",
+          ".zpkg"
         ],
         "configuration": "./language-configuration.json"
       }
